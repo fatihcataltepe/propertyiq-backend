@@ -1,0 +1,9 @@
+rootProject.name = 'propertyiq-backend'
+
+include 'auth-service'
+include 'portfolio-service'
+include 'expense-service'
+include 'analytics-service'
+include 'reporting-service'
+include 'notification-service'
+include 'common'
