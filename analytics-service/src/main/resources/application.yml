@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: analytics-service
+  redis:
+    host: localhost
+    port: 6379
+
+server:
+  port: 8084
+
+logging:
+  level:
+    com.propertyiq.analytics: DEBUG
+    org.springframework.web: INFO
+
+# Service URLs for inter-service communication
+services:
+  portfolio:
+    url: http://localhost:8082
+  expense:
+    url: http://localhost:8083

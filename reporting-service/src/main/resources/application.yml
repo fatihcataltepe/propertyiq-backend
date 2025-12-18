@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: reporting-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/reporting_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8085
+
+logging:
+  level:
+    com.propertyiq.reporting: DEBUG
+    org.springframework.web: INFO
+
+# Service URLs for inter-service communication
+services:
+  portfolio:
+    url: http://localhost:8082
+  expense:
+    url: http://localhost:8083
+  analytics:
+    url: http://localhost:8084
