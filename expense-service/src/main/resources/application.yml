@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: expense-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/expense_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8083
+
+logging:
+  level:
+    com.propertyiq.expense: DEBUG
+    org.springframework.web: INFO
