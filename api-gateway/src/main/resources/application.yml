@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000,http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+  redis:
+    host: localhost
+    port: 6379
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.propertyiq.gateway: DEBUG
+    reactor.netty: INFO
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-change-this-in-production}
+  expiration: 3600000 # 1 hour in milliseconds
+
+# Service URLs (can be overridden for production)
+services:
+  auth:
+    url: http://localhost:8081
+  portfolio:
+    url: http://localhost:8082
+  expense:
+    url: http://localhost:8083
+  analytics:
+    url: http://localhost:8084
+  reporting:
+    url: http://localhost:8085
+  notification:
+    url: http://localhost:8086
