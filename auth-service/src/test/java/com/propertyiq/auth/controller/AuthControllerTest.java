@@ -1,10 +1,13 @@
 package com.propertyiq.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.propertyiq.auth.dto.LoginRequest;
+import com.propertyiq.auth.dto.LoginResponse;
 import com.propertyiq.auth.dto.SignupRequest;
 import com.propertyiq.auth.dto.UserResponse;
 import com.propertyiq.auth.exception.AuthExceptionHandler;
 import com.propertyiq.auth.exception.EmailAlreadyExistsException;
+import com.propertyiq.auth.exception.InvalidCredentialsException;
 import com.propertyiq.auth.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,6 +44,8 @@ class AuthControllerTest {
 
     private SignupRequest validSignupRequest;
     private UserResponse userResponse;
+    private LoginRequest validLoginRequest;
+    private LoginResponse loginResponse;
 
     @BeforeEach
     void setUp() {
@@ -58,6 +63,18 @@ class AuthControllerTest {
                 .subscriptionTier("free")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
+                .build();
+
+        validLoginRequest = LoginRequest.builder()
+                .email("test@example.com")
+                .password("password123")
+                .build();
+
+        loginResponse = LoginResponse.builder()
+                .accessToken("sample-jwt-token")
+                .tokenType("Bearer")
+                .expiresIn(3600)
+                .user(userResponse)
                 .build();
     }
 
@@ -177,6 +194,91 @@ class AuthControllerTest {
                 .build();
 
         mockMvc.perform(post("/auth/signup")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Should return 200 OK when login is successful")
+    @WithMockUser
+    void login_WithValidCredentials_ShouldReturn200() throws Exception {
+        when(authService.login(any(LoginRequest.class))).thenReturn(loginResponse);
+
+        mockMvc.perform(post("/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validLoginRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Login successful"))
+                .andExpect(jsonPath("$.data.accessToken").value("sample-jwt-token"))
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.expiresIn").value(3600))
+                .andExpect(jsonPath("$.data.user.email").value("test@example.com"))
+                .andExpect(jsonPath("$.data.user.name").value("Test User"));
+    }
+
+    @Test
+    @DisplayName("Should return 401 Unauthorized when credentials are invalid")
+    @WithMockUser
+    void login_WithInvalidCredentials_ShouldReturn401() throws Exception {
+        when(authService.login(any(LoginRequest.class)))
+                .thenThrow(new InvalidCredentialsException());
+
+        mockMvc.perform(post("/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validLoginRequest)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Invalid email or password"));
+    }
+
+    @Test
+    @DisplayName("Should return 400 Bad Request when login email is missing")
+    @WithMockUser
+    void login_WithMissingEmail_ShouldReturn400() throws Exception {
+        LoginRequest invalidRequest = LoginRequest.builder()
+                .password("password123")
+                .build();
+
+        mockMvc.perform(post("/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Should return 400 Bad Request when login password is missing")
+    @WithMockUser
+    void login_WithMissingPassword_ShouldReturn400() throws Exception {
+        LoginRequest invalidRequest = LoginRequest.builder()
+                .email("test@example.com")
+                .build();
+
+        mockMvc.perform(post("/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("Should return 400 Bad Request when login email format is invalid")
+    @WithMockUser
+    void login_WithInvalidEmailFormat_ShouldReturn400() throws Exception {
+        LoginRequest invalidRequest = LoginRequest.builder()
+                .email("invalid-email")
+                .password("password123")
+                .build();
+
+        mockMvc.perform(post("/auth/login")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))

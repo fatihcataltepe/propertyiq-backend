@@ -1,5 +1,7 @@
 package com.propertyiq.auth.controller;
 
+import com.propertyiq.auth.dto.LoginRequest;
+import com.propertyiq.auth.dto.LoginResponse;
 import com.propertyiq.auth.dto.SignupRequest;
 import com.propertyiq.auth.dto.UserResponse;
 import com.propertyiq.auth.service.AuthService;
@@ -29,11 +31,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<Map<String, String>>> login(@RequestBody Map<String, String> request) {
-        // TODO: Implement login logic
-        Map<String, String> response = new HashMap<>();
-        response.put("token", "sample-jwt-token");
-        return ResponseEntity.ok(ApiResponse.success(response));
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse loginResponse = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success("Login successful", loginResponse));
     }
 
     @PostMapping("/refresh")

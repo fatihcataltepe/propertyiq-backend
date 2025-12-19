@@ -1,9 +1,12 @@
 package com.propertyiq.auth.service;
 
+import com.propertyiq.auth.dto.LoginRequest;
+import com.propertyiq.auth.dto.LoginResponse;
 import com.propertyiq.auth.dto.SignupRequest;
 import com.propertyiq.auth.dto.UserResponse;
 import com.propertyiq.auth.entity.User;
 import com.propertyiq.auth.exception.EmailAlreadyExistsException;
+import com.propertyiq.auth.exception.InvalidCredentialsException;
 import com.propertyiq.auth.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,10 +37,14 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private JwtService jwtService;
+
     @InjectMocks
     private AuthService authService;
 
     private SignupRequest validSignupRequest;
+    private LoginRequest validLoginRequest;
     private User savedUser;
 
     @BeforeEach
@@ -56,6 +64,11 @@ class AuthServiceTest {
                 .subscriptionTier("free")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
+                .build();
+
+        validLoginRequest = LoginRequest.builder()
+                .email("test@example.com")
+                .password("password123")
                 .build();
     }
 
@@ -180,5 +193,92 @@ class AuthServiceTest {
         assertThat(capturedUser.isEmailVerified()).isFalse();
         assertThat(capturedUser.getSubscriptionTier()).isEqualTo("free");
         // Note: createdAt and updatedAt are set by @PrePersist during actual persistence
+    }
+
+    @Test
+    @DisplayName("Should successfully login with valid credentials")
+    void login_WithValidCredentials_ShouldReturnLoginResponse() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(true);
+        when(jwtService.generateToken(savedUser)).thenReturn("jwt-token");
+        when(jwtService.getExpirationMs()).thenReturn(3600000L);
+
+        LoginResponse response = authService.login(validLoginRequest);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getAccessToken()).isEqualTo("jwt-token");
+        assertThat(response.getTokenType()).isEqualTo("Bearer");
+        assertThat(response.getExpiresIn()).isEqualTo(3600);
+        assertThat(response.getUser()).isNotNull();
+        assertThat(response.getUser().getEmail()).isEqualTo("test@example.com");
+
+        verify(userRepository).findByEmail("test@example.com");
+        verify(passwordEncoder).matches("password123", "hashedPassword");
+        verify(jwtService).generateToken(savedUser);
+    }
+
+    @Test
+    @DisplayName("Should throw exception when user not found during login")
+    void login_WithNonExistentUser_ShouldThrowException() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(validLoginRequest))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Invalid email or password");
+
+        verify(userRepository).findByEmail("test@example.com");
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(jwtService, never()).generateToken(any(User.class));
+    }
+
+    @Test
+    @DisplayName("Should throw exception when password is incorrect")
+    void login_WithIncorrectPassword_ShouldThrowException() {
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(validLoginRequest))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Invalid email or password");
+
+        verify(userRepository).findByEmail("test@example.com");
+        verify(passwordEncoder).matches("password123", "hashedPassword");
+        verify(jwtService, never()).generateToken(any(User.class));
+    }
+
+    @Test
+    @DisplayName("Should normalize email to lowercase during login")
+    void login_WithUppercaseEmail_ShouldNormalizeToLowercase() {
+        LoginRequest requestWithUppercaseEmail = LoginRequest.builder()
+                .email("TEST@EXAMPLE.COM")
+                .password("password123")
+                .build();
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(true);
+        when(jwtService.generateToken(savedUser)).thenReturn("jwt-token");
+        when(jwtService.getExpirationMs()).thenReturn(3600000L);
+
+        authService.login(requestWithUppercaseEmail);
+
+        verify(userRepository).findByEmail("test@example.com");
+    }
+
+    @Test
+    @DisplayName("Should trim whitespace from email during login")
+    void login_WithWhitespaceInEmail_ShouldTrimEmail() {
+        LoginRequest requestWithWhitespaceEmail = LoginRequest.builder()
+                .email("  test@example.com  ")
+                .password("password123")
+                .build();
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(savedUser));
+        when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(true);
+        when(jwtService.generateToken(savedUser)).thenReturn("jwt-token");
+        when(jwtService.getExpirationMs()).thenReturn(3600000L);
+
+        authService.login(requestWithWhitespaceEmail);
+
+        verify(userRepository).findByEmail("test@example.com");
     }
 }
