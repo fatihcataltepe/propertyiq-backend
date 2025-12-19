@@ -8,10 +8,13 @@ import com.propertyiq.auth.entity.User;
 import com.propertyiq.auth.exception.EmailAlreadyExistsException;
 import com.propertyiq.auth.exception.InvalidCredentialsException;
 import com.propertyiq.auth.repository.UserRepository;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Transactional
     public UserResponse signup(SignupRequest request) {
@@ -58,5 +62,33 @@ public class AuthService {
                 .expiresIn(jwtService.getExpirationMs() / 1000)
                 .user(UserResponse.fromEntity(user))
                 .build();
+    }
+
+    public boolean logout(String token) {
+        if (token == null || token.isEmpty()) {
+            return false;
+        }
+
+        Claims claims = jwtService.parseToken(token);
+        if (claims == null) {
+            return false;
+        }
+
+        String jti = claims.getId();
+        if (jti == null || jti.isEmpty()) {
+            return false;
+        }
+
+        Date expiration = claims.getExpiration();
+        if (expiration == null || expiration.before(new Date())) {
+            return true;
+        }
+
+        long ttlSeconds = (expiration.getTime() - System.currentTimeMillis()) / 1000;
+        if (ttlSeconds > 0) {
+            tokenBlacklistService.blacklistToken(jti, ttlSeconds);
+        }
+
+        return true;
     }
 }

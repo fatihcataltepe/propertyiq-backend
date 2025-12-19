@@ -45,7 +45,22 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Authorization header with Bearer token is required"));
+        }
+
+        String token = authHeader.substring(7);
+        boolean success = authService.logout(token);
+
+        if (!success) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid token"));
+        }
+
+        return ResponseEntity.ok(ApiResponse.success("Logout successful. Token has been invalidated.", null));
     }
 }

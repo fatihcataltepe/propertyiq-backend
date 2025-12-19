@@ -8,6 +8,7 @@ import com.propertyiq.auth.entity.User;
 import com.propertyiq.auth.exception.EmailAlreadyExistsException;
 import com.propertyiq.auth.exception.InvalidCredentialsException;
 import com.propertyiq.auth.repository.UserRepository;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,6 +41,9 @@ class AuthServiceTest {
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
 
     @InjectMocks
     private AuthService authService;
@@ -280,5 +285,92 @@ class AuthServiceTest {
         authService.login(requestWithWhitespaceEmail);
 
         verify(userRepository).findByEmail("test@example.com");
+    }
+
+    @Test
+    @DisplayName("Should successfully logout and blacklist token")
+    void logout_WithValidToken_ShouldBlacklistToken() {
+        String token = "valid-jwt-token";
+        String jti = "test-jti-123";
+        Date expiration = new Date(System.currentTimeMillis() + 3600000);
+
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn(jti);
+        when(claims.getExpiration()).thenReturn(expiration);
+        when(jwtService.parseToken(token)).thenReturn(claims);
+
+        boolean result = authService.logout(token);
+
+        assertThat(result).isTrue();
+        verify(jwtService).parseToken(token);
+        verify(tokenBlacklistService).blacklistToken(eq(jti), anyLong());
+    }
+
+    @Test
+    @DisplayName("Should return false when token is null")
+    void logout_WithNullToken_ShouldReturnFalse() {
+        boolean result = authService.logout(null);
+
+        assertThat(result).isFalse();
+        verify(jwtService, never()).parseToken(anyString());
+        verify(tokenBlacklistService, never()).blacklistToken(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Should return false when token is empty")
+    void logout_WithEmptyToken_ShouldReturnFalse() {
+        boolean result = authService.logout("");
+
+        assertThat(result).isFalse();
+        verify(jwtService, never()).parseToken(anyString());
+        verify(tokenBlacklistService, never()).blacklistToken(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Should return false when token is invalid")
+    void logout_WithInvalidToken_ShouldReturnFalse() {
+        String token = "invalid-token";
+        when(jwtService.parseToken(token)).thenReturn(null);
+
+        boolean result = authService.logout(token);
+
+        assertThat(result).isFalse();
+        verify(jwtService).parseToken(token);
+        verify(tokenBlacklistService, never()).blacklistToken(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Should return true when token is already expired")
+    void logout_WithExpiredToken_ShouldReturnTrueWithoutBlacklisting() {
+        String token = "expired-token";
+        String jti = "test-jti-123";
+        Date expiration = new Date(System.currentTimeMillis() - 1000);
+
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn(jti);
+        when(claims.getExpiration()).thenReturn(expiration);
+        when(jwtService.parseToken(token)).thenReturn(claims);
+
+        boolean result = authService.logout(token);
+
+        assertThat(result).isTrue();
+        verify(jwtService).parseToken(token);
+        verify(tokenBlacklistService, never()).blacklistToken(anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Should return false when token has no JTI")
+    void logout_WithTokenWithoutJti_ShouldReturnFalse() {
+        String token = "token-without-jti";
+
+        Claims claims = mock(Claims.class);
+        when(claims.getId()).thenReturn(null);
+        when(jwtService.parseToken(token)).thenReturn(claims);
+
+        boolean result = authService.logout(token);
+
+        assertThat(result).isFalse();
+        verify(jwtService).parseToken(token);
+        verify(tokenBlacklistService, never()).blacklistToken(anyString(), anyLong());
     }
 }

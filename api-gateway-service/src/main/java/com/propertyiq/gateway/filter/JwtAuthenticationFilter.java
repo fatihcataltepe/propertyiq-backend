@@ -1,5 +1,6 @@
 package com.propertyiq.gateway.filter;
 
+import com.propertyiq.gateway.service.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
@@ -22,9 +23,11 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     private String jwtSecret;
 
     private JwtParser jwtParser;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    public JwtAuthenticationFilter() {
+    public JwtAuthenticationFilter(TokenBlacklistService tokenBlacklistService) {
         super(Config.class);
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @PostConstruct
@@ -51,19 +54,33 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
             try {
                 Claims claims = jwtParser.parseClaimsJws(token).getBody();
+                String jti = claims.getId();
 
-                // Add user info to request headers for downstream services
-                ServerWebExchange modifiedExchange = exchange.mutate()
-                        .request(r -> r.header("X-User-Id", claims.getSubject())
-                                      .header("X-User-Email", claims.get("email", String.class))
-                                      .header("X-User-Roles", claims.get("roles", String.class)))
-                        .build();
+                if (jti != null && !jti.isEmpty()) {
+                    return tokenBlacklistService.isBlacklisted(jti)
+                            .flatMap(isBlacklisted -> {
+                                if (isBlacklisted) {
+                                    return onError(exchange, "Token has been revoked", HttpStatus.UNAUTHORIZED);
+                                }
+                                return processValidToken(exchange, chain, claims);
+                            });
+                }
 
-                return chain.filter(modifiedExchange);
+                return processValidToken(exchange, chain, claims);
             } catch (Exception e) {
                 return onError(exchange, "Invalid JWT token: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
             }
         };
+    }
+
+    private Mono<Void> processValidToken(ServerWebExchange exchange, org.springframework.cloud.gateway.filter.GatewayFilterChain chain, Claims claims) {
+        ServerWebExchange modifiedExchange = exchange.mutate()
+                .request(r -> r.header("X-User-Id", claims.getSubject())
+                              .header("X-User-Email", claims.get("email", String.class))
+                              .header("X-User-Roles", claims.get("roles", String.class)))
+                .build();
+
+        return chain.filter(modifiedExchange);
     }
 
     private Mono<Void> onError(ServerWebExchange exchange, String error, HttpStatus httpStatus) {

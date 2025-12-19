@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -287,13 +288,53 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("Should return 200 OK when logout is successful")
+    @DisplayName("Should return 200 OK when logout is successful with valid token")
     @WithMockUser
-    void logout_ShouldReturn200() throws Exception {
+    void logout_WithValidToken_ShouldReturn200() throws Exception {
+        when(authService.logout(anyString())).thenReturn(true);
+
         mockMvc.perform(post("/auth/logout")
-                        .with(csrf()))
+                        .with(csrf())
+                        .header("Authorization", "Bearer valid-jwt-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Logout successful"));
+                .andExpect(jsonPath("$.message").value("Logout successful. Token has been invalidated."));
+    }
+
+    @Test
+    @DisplayName("Should return 401 Unauthorized when Authorization header is missing")
+    @WithMockUser
+    void logout_WithoutAuthorizationHeader_ShouldReturn401() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authorization header with Bearer token is required"));
+    }
+
+    @Test
+    @DisplayName("Should return 401 Unauthorized when Authorization header format is invalid")
+    @WithMockUser
+    void logout_WithInvalidAuthorizationFormat_ShouldReturn401() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .with(csrf())
+                        .header("Authorization", "InvalidFormat token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Authorization header with Bearer token is required"));
+    }
+
+    @Test
+    @DisplayName("Should return 401 Unauthorized when token is invalid")
+    @WithMockUser
+    void logout_WithInvalidToken_ShouldReturn401() throws Exception {
+        when(authService.logout(anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/auth/logout")
+                        .with(csrf())
+                        .header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Invalid token"));
     }
 }

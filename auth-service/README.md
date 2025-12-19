@@ -316,22 +316,56 @@ curl -X POST http://localhost:8081/auth/login \
 
 ### Logout
 
+The logout endpoint invalidates the JWT token by adding it to a Redis-based blacklist. The token will be rejected by the API Gateway until it expires.
+
 #### 1. Successful Logout
 
 ```bash
-curl -X POST http://localhost:8081/auth/logout
+curl -X POST http://localhost:8081/auth/logout \
+  -H "Authorization: Bearer <your-jwt-token>"
 ```
 
 **Expected Response (200 OK):**
 ```json
 {
   "success": true,
-  "message": "Logout successful",
+  "message": "Logout successful. Token has been invalidated.",
   "data": null
 }
 ```
 
-**Note:** This is a stateless logout. The client is responsible for deleting the stored access token. Server-side token invalidation (via token blacklist or refresh token revocation) is not yet implemented.
+#### 2. Missing Authorization Header
+
+```bash
+curl -X POST http://localhost:8081/auth/logout
+```
+
+**Expected Response (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "Authorization header with Bearer token is required",
+  "data": null
+}
+```
+
+#### 3. Invalid Token
+
+```bash
+curl -X POST http://localhost:8081/auth/logout \
+  -H "Authorization: Bearer invalid-token"
+```
+
+**Expected Response (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "Invalid token",
+  "data": null
+}
+```
+
+**Note:** Token invalidation requires Redis to be running. The token is stored in a blacklist with a TTL matching its remaining lifetime. The API Gateway checks this blacklist before accepting tokens.
 
 ### Verifying Data in PostgreSQL
 
