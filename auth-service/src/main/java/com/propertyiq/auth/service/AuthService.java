@@ -22,7 +22,7 @@ public class AuthService {
         String normalizedEmail = request.getEmail().toLowerCase().trim();
         
         if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new EmailAlreadyExistsException(request.getEmail());
+            throw new EmailAlreadyExistsException(normalizedEmail);
         }
 
         User user = User.builder()
