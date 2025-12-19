@@ -71,7 +71,7 @@ class AuthServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getEmail()).isEqualTo("test@example.com");
         assertThat(response.getName()).isEqualTo("Test User");
-        assertThat(response.getEmailVerified()).isFalse();
+        assertThat(response.isEmailVerified()).isFalse();
         assertThat(response.getSubscriptionTier()).isEqualTo("free");
         assertThat(response.getId()).isNotNull();
 

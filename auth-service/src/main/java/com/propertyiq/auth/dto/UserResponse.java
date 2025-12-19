@@ -18,7 +18,7 @@ public class UserResponse {
     private UUID id;
     private String email;
     private String name;
-    private Boolean emailVerified;
+    private boolean emailVerified;
     private String subscriptionTier;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
