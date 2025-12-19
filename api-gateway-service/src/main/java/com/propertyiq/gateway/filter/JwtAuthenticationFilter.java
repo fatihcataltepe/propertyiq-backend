@@ -28,7 +28,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
     }
 
     @PostConstruct
-    void init() {
+    public void init() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
         this.jwtParser = Jwts.parser()
                 .setSigningKey(keyBytes)

@@ -4,7 +4,7 @@ This report identifies several areas in the codebase where efficiency improvemen
 
 ## Issue 1: JWT Parser Recreation on Every Request (HIGH IMPACT)
 
-**Location:** `api-gateway-service/src/main/java/com/propertyiq/gateway/filter/JwtAuthenticationFilter.java` (lines 38-43)
+**Location:** `api-gateway-service/src/main/java/com/propertyiq/gateway/filter/JwtAuthenticationFilter.java`
 
 **Current Code:**
 ```java
