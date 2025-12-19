@@ -11,7 +11,10 @@ subprojects {
 
     group = 'com.propertyiq'
     version = '0.0.1-SNAPSHOT'
-    sourceCompatibility = '21'
+    
+    java {
+        sourceCompatibility = '21'
+    }
 
     repositories {
         mavenCentral()

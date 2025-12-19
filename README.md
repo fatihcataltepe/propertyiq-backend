@@ -6,6 +6,7 @@ Java Spring Boot microservices backend for PropertyIQ real estate investment ana
 
 This is a multi-module Gradle project with the following microservices:
 
+- **api-gateway**: API Gateway for routing and authentication
 - **auth-service**: Authentication, user management, JWT token handling
 - **portfolio-service**: Property management, mortgages, investments
 - **expense-service**: Property expenses tracking
@@ -39,6 +40,7 @@ This is a multi-module Gradle project with the following microservices:
 Each service can be run independently:
 
 ```bash
+./gradlew :api-gateway-service:bootRun
 ./gradlew :auth-service:bootRun
 ./gradlew :portfolio-service:bootRun
 ./gradlew :expense-service:bootRun
@@ -53,7 +55,6 @@ The project structure follows a microservices architecture with each service bei
 
 Next steps:
 - Implement service internals
-- Add API Gateway
 - Configure service discovery
 - Add observability stack (Prometheus, Grafana, Jaeger)
 - Add Docker and Kubernetes deployment configs

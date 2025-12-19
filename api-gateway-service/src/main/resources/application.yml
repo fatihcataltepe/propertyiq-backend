@@ -1,6 +1,6 @@
 spring:
   application:
-    name: api-gateway
+    name: api-gateway-service
   cloud:
     gateway:
       default-filters:

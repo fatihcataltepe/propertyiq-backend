@@ -125,7 +125,7 @@ spring:
 ### Docker
 ```dockerfile
 FROM eclipse-temurin:21-jre-alpine
-COPY build/libs/api-gateway-0.0.1-SNAPSHOT.jar app.jar
+COPY build/libs/api-gateway-service-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app.jar"]
 ```
@@ -135,14 +135,14 @@ ENTRYPOINT ["java", "-jar", "/app.jar"]
 apiVersion: v1
 kind: Service
 metadata:
-  name: api-gateway
+  name: api-gateway-service
 spec:
   type: LoadBalancer
   ports:
     - port: 80
       targetPort: 8080
   selector:
-    app: api-gateway
+    app: api-gateway-service
 ```
 
 ## Testing
