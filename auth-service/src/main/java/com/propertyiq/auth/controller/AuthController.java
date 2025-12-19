@@ -43,4 +43,9 @@ public class AuthController {
         response.put("token", "refreshed-jwt-token");
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout() {
+        return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
+    }
 }

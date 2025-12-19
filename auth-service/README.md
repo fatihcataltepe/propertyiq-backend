@@ -224,6 +224,115 @@ curl -X POST http://localhost:8081/auth/signup \
 }
 ```
 
+### Login
+
+#### 1. Successful Login
+
+```bash
+curl -X POST http://localhost:8081/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "password123"
+  }'
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
+    "tokenType": "Bearer",
+    "expiresIn": 3600,
+    "user": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "email": "test@example.com",
+      "name": "Test User",
+      "emailVerified": false,
+      "subscriptionTier": "free",
+      "createdAt": "2025-12-19T15:00:00",
+      "updatedAt": "2025-12-19T15:00:00"
+    }
+  }
+}
+```
+
+#### 2. Invalid Credentials (Wrong Password)
+
+```bash
+curl -X POST http://localhost:8081/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "wrongpassword"
+  }'
+```
+
+**Expected Response (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "Invalid email or password",
+  "data": null
+}
+```
+
+#### 3. Invalid Credentials (Non-existent User)
+
+```bash
+curl -X POST http://localhost:8081/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "nonexistent@example.com",
+    "password": "password123"
+  }'
+```
+
+**Expected Response (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "Invalid email or password",
+  "data": null
+}
+```
+
+#### 4. Email Case Insensitivity
+
+Emails are normalized to lowercase, so you can login with any case:
+
+```bash
+curl -X POST http://localhost:8081/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "TEST@EXAMPLE.COM",
+    "password": "password123"
+  }'
+```
+
+**Expected Response (200 OK):** Same as successful login above.
+
+### Logout
+
+#### 1. Successful Logout
+
+```bash
+curl -X POST http://localhost:8081/auth/logout
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Logout successful",
+  "data": null
+}
+```
+
+**Note:** This is a stateless logout. The client is responsible for deleting the stored access token. Server-side token invalidation (via token blacklist or refresh token revocation) is not yet implemented.
+
 ### Verifying Data in PostgreSQL
 
 You can connect to the PostgreSQL container to verify the data:

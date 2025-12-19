@@ -285,4 +285,15 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
     }
+
+    @Test
+    @DisplayName("Should return 200 OK when logout is successful")
+    @WithMockUser
+    void logout_ShouldReturn200() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Logout successful"));
+    }
 }
