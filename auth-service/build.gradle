@@ -10,3 +10,9 @@ dependencies {
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
 }
+
+// Exclude LocalIT tests from default test run (they require external PostgreSQL)
+// Run them with: ./gradlew :auth-service:test --tests "*LocalIT" -Dspring.profiles.active=integration-local
+test {
+    exclude '**/*LocalIT*'
+}
