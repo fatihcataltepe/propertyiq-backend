@@ -23,6 +23,8 @@ management:
       exposure:
         include: health,info,metrics
 
+# WARNING: The default JWT secret below is intended for local development only and is NOT secure for production.
+#          Always override JWT_SECRET with a strong, unique value (at least 32 bytes) in production environments.
 jwt:
   secret: ${JWT_SECRET:propertyiq-default-secret-key-for-development-only-change-in-production}
   expiration: ${JWT_EXPIRATION:3600000}

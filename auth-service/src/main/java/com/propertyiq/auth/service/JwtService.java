@@ -19,7 +19,14 @@ public class JwtService {
     public JwtService(
             @Value("${jwt.secret:propertyiq-default-secret-key-for-development-only-change-in-production}") String secret,
             @Value("${jwt.expiration:3600000}") long expirationMs) {
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalArgumentException("jwt.secret must not be blank");
+        }
+        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("jwt.secret must be at least 32 bytes (256 bits) long for HMAC-SHA signing");
+        }
+        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
         this.expirationMs = expirationMs;
     }
 
