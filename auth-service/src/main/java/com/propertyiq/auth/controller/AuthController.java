@@ -1,6 +1,12 @@
 package com.propertyiq.auth.controller;
 
+import com.propertyiq.auth.dto.SignupRequest;
+import com.propertyiq.auth.dto.UserResponse;
+import com.propertyiq.auth.service.AuthService;
 import com.propertyiq.common.dto.ApiResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -9,14 +15,17 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
+    private final AuthService authService;
+
     @PostMapping("/signup")
-    public ResponseEntity<ApiResponse<Map<String, String>>> signup(@RequestBody Map<String, String> request) {
-        // TODO: Implement signup logic
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Signup endpoint - implementation pending");
-        return ResponseEntity.ok(ApiResponse.success(response));
+    public ResponseEntity<ApiResponse<UserResponse>> signup(@Valid @RequestBody SignupRequest request) {
+        UserResponse userResponse = authService.signup(request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success("User registered successfully", userResponse));
     }
 
     @PostMapping("/login")

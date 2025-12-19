@@ -55,6 +55,202 @@ Manages user authentication, authorization, JWT token issuance and validation, a
 - `JWT_EXPIRATION` - JWT token expiration time (default: 1h)
 - `REFRESH_TOKEN_EXPIRATION` - Refresh token expiration (default: 7d)
 
+## Local Development with Docker
+
+### Prerequisites
+
+Make sure you don't have a local PostgreSQL running on port 5432 (it will conflict with Docker):
+```bash
+# Check what's using port 5432
+lsof -iTCP:5432 -sTCP:LISTEN
+
+# If you have Homebrew PostgreSQL running, stop it:
+brew services stop postgresql
+```
+
+### Starting Dependencies
+
+From the project root directory:
+```bash
+# Start PostgreSQL and Redis containers
+docker-compose up -d
+
+# Verify containers are running
+docker-compose ps
+```
+
+### Running the Auth Service
+
+```bash
+# From project root
+./gradlew :auth-service:bootRun
+```
+
+The service will start on port 8081 and automatically create the `users` table in the `auth_db` database.
+
+### Testing with curl
+
+#### 1. Successful User Registration
+
+```bash
+curl -X POST http://localhost:8081/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "password123",
+    "name": "Test User"
+  }'
+```
+
+**Expected Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "test@example.com",
+    "name": "Test User",
+    "emailVerified": false,
+    "subscriptionTier": "free",
+    "createdAt": "2025-12-19T15:00:00",
+    "updatedAt": "2025-12-19T15:00:00"
+  }
+}
+```
+
+#### 2. Duplicate Email Registration
+
+```bash
+curl -X POST http://localhost:8081/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "password123",
+    "name": "Another User"
+  }'
+```
+
+**Expected Response (409 Conflict):**
+```json
+{
+  "success": false,
+  "message": "User with email 'test@example.com' already exists",
+  "data": null
+}
+```
+
+#### 3. Email Case Insensitivity
+
+Emails are normalized to lowercase, so `TEST@EXAMPLE.COM` is treated the same as `test@example.com`:
+
+```bash
+curl -X POST http://localhost:8081/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "TEST@EXAMPLE.COM",
+    "password": "password123",
+    "name": "Uppercase Email User"
+  }'
+```
+
+**Expected Response (409 Conflict):**
+```json
+{
+  "success": false,
+  "message": "User with email 'test@example.com' already exists",
+  "data": null
+}
+```
+
+#### 4. Invalid Email Format
+
+```bash
+curl -X POST http://localhost:8081/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "invalid-email",
+    "password": "password123",
+    "name": "Test User"
+  }'
+```
+
+**Expected Response (400 Bad Request):**
+```json
+{
+  "success": false,
+  "message": "email: Invalid email format",
+  "data": null
+}
+```
+
+#### 5. Password Too Short
+
+```bash
+curl -X POST http://localhost:8081/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@example.com",
+    "password": "short",
+    "name": "Test User"
+  }'
+```
+
+**Expected Response (400 Bad Request):**
+```json
+{
+  "success": false,
+  "message": "password: Password must be between 8 and 100 characters",
+  "data": null
+}
+```
+
+#### 6. Missing Required Fields
+
+```bash
+curl -X POST http://localhost:8081/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@example.com"
+  }'
+```
+
+**Expected Response (400 Bad Request):**
+```json
+{
+  "success": false,
+  "message": "password: Password is required; name: Name is required",
+  "data": null
+}
+```
+
+### Verifying Data in PostgreSQL
+
+You can connect to the PostgreSQL container to verify the data:
+
+```bash
+# Connect to the database
+docker exec -it propertyiq-postgres psql -U postgres -d auth_db
+
+# List users
+SELECT id, email, name, emailverified, subscriptiontier, createdat FROM users;
+
+# Exit psql
+\q
+```
+
+### Stopping Services
+
+```bash
+# Stop the auth-service with Ctrl+C
+
+# Stop and remove Docker containers (keeps data)
+docker-compose down
+
+# Stop and remove containers AND volumes (deletes all data)
+docker-compose down -v
+```
+
 ## Integration
 All other services validate JWT tokens issued by this service. The auth service provides:
 - Public key for JWT validation
