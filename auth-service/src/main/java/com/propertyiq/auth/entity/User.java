@@ -30,18 +30,18 @@ public class User {
     @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(name = "emailverified")
+    @Column(name = "emailverified", nullable = false)
     @Builder.Default
-    private Boolean emailVerified = false;
+    private boolean emailVerified = false;
 
     @Column(name = "subscriptiontier", length = 50)
     @Builder.Default
     private String subscriptionTier = "free";
 
-    @Column(name = "createdat")
+    @Column(name = "createdat", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updatedat")
+    @Column(name = "updatedat", nullable = false)
     private LocalDateTime updatedAt;
 
     @PrePersist

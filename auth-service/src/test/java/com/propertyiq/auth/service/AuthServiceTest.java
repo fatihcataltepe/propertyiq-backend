@@ -177,7 +177,7 @@ class AuthServiceTest {
         verify(userRepository).save(userCaptor.capture());
 
         User capturedUser = userCaptor.getValue();
-        assertThat(capturedUser.getEmailVerified()).isFalse();
+        assertThat(capturedUser.isEmailVerified()).isFalse();
         assertThat(capturedUser.getSubscriptionTier()).isEqualTo("free");
         // Note: createdAt and updatedAt are set by @PrePersist during actual persistence
     }

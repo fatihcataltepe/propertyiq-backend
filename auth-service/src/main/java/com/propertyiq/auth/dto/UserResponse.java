@@ -28,7 +28,7 @@ public class UserResponse {
                 .id(user.getId())
                 .email(user.getEmail())
                 .name(user.getName())
-                .emailVerified(user.getEmailVerified())
+                .emailVerified(user.isEmailVerified())
                 .subscriptionTier(user.getSubscriptionTier())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
