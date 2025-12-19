@@ -251,6 +251,156 @@ docker-compose down
 docker-compose down -v
 ```
 
+## Testing
+
+### Running Unit Tests
+
+The auth-service includes comprehensive unit tests for both the service and controller layers. Run all tests using:
+
+```bash
+# Run all auth-service tests
+./gradlew :auth-service:test
+
+# Run with verbose output
+./gradlew :auth-service:test --info
+```
+
+### Test Coverage
+
+The test suite covers the following areas:
+
+**AuthService Tests** (`AuthServiceTest.java`):
+- User registration with valid data
+- Duplicate email detection
+- Email normalization (case insensitivity)
+- Name trimming
+- Password hashing
+- Default value assignment
+
+**AuthController Tests** (`AuthControllerTest.java`):
+- Successful signup (201 Created)
+- Duplicate email handling (409 Conflict)
+- Validation errors for missing/invalid fields (400 Bad Request)
+
+**UserService Tests** (`UserServiceTest.java`):
+- Get user by ID (success and not found scenarios)
+- Update user profile with valid name
+- Name trimming on update
+- Handling null/blank name updates
+- User not found on update
+
+**UserController Tests** (`UserControllerTest.java`):
+- GET /users/me - Returns current user profile
+- GET /users/me - Returns 404 when user not found
+- GET /users/{id} - Returns user by ID
+- GET /users/{id} - Returns 404 when user not found
+- PUT /users/me - Updates user profile successfully
+- PUT /users/me - Returns 404 when user not found
+- PUT /users/me - Validates name length constraint
+
+### Test Architecture
+
+Tests use the following patterns:
+
+- **Controller Tests**: Use `@WebMvcTest` with `MockMvc` for HTTP layer testing. Services are mocked using `@MockBean`.
+- **Service Tests**: Use `@ExtendWith(MockitoExtension.class)` for pure unit testing with mocked repositories.
+- **Security**: Tests use `@WithMockUser` to bypass Spring Security authentication.
+- **Assertions**: AssertJ is used for fluent assertions.
+
+### Testing User Profile Endpoints with curl
+
+After starting the service, you can test the user profile endpoints. Note that these endpoints require the `X-User-Id` header which is normally set by the API Gateway after JWT validation.
+
+#### Get Current User Profile
+
+```bash
+curl -X GET http://localhost:8081/users/me \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000"
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "test@example.com",
+    "name": "Test User",
+    "emailVerified": false,
+    "subscriptionTier": "free",
+    "createdAt": "2025-12-19T15:00:00",
+    "updatedAt": "2025-12-19T15:00:00"
+  }
+}
+```
+
+#### Get User by ID (Internal Use)
+
+```bash
+curl -X GET http://localhost:8081/users/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "test@example.com",
+    "name": "Test User",
+    "emailVerified": false,
+    "subscriptionTier": "free",
+    "createdAt": "2025-12-19T15:00:00",
+    "updatedAt": "2025-12-19T15:00:00"
+  }
+}
+```
+
+#### Update User Profile
+
+```bash
+curl -X PUT http://localhost:8081/users/me \
+  -H "Content-Type: application/json" \
+  -H "X-User-Id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{
+    "name": "Updated Name"
+  }'
+```
+
+**Expected Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "User profile updated successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "test@example.com",
+    "name": "Updated Name",
+    "emailVerified": false,
+    "subscriptionTier": "free",
+    "createdAt": "2025-12-19T15:00:00",
+    "updatedAt": "2025-12-19T15:00:00"
+  }
+}
+```
+
+#### User Not Found
+
+```bash
+curl -X GET http://localhost:8081/users/00000000-0000-0000-0000-000000000000
+```
+
+**Expected Response (404 Not Found):**
+```json
+{
+  "success": false,
+  "message": "User with id '00000000-0000-0000-0000-000000000000' not found",
+  "data": null
+}
+```
+
 ## Integration
 All other services validate JWT tokens issued by this service. The auth service provides:
 - Public key for JWT validation
