@@ -19,12 +19,14 @@ public class AuthService {
 
     @Transactional
     public UserResponse signup(SignupRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String normalizedEmail = request.getEmail().toLowerCase().trim();
+        
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
 
         User user = User.builder()
-                .email(request.getEmail().toLowerCase().trim())
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName().trim())
                 .build();

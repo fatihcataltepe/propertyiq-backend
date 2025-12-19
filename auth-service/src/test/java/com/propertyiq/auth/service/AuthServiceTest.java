@@ -95,7 +95,7 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Should normalize email to lowercase")
+    @DisplayName("Should normalize email to lowercase and use normalized email for duplicate check")
     void signup_WithUppercaseEmail_ShouldNormalizeToLowercase() {
         SignupRequest requestWithUppercaseEmail = SignupRequest.builder()
                 .email("TEST@EXAMPLE.COM")
@@ -103,11 +103,14 @@ class AuthServiceTest {
                 .name("Test User")
                 .build();
 
-        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hashedPassword");
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
         authService.signup(requestWithUppercaseEmail);
+
+        // Verify existsByEmail is called with normalized (lowercase) email
+        verify(userRepository).existsByEmail("test@example.com");
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());
@@ -162,6 +165,9 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
             user.setId(UUID.randomUUID());
+            // Simulate @PrePersist behavior
+            user.setCreatedAt(LocalDateTime.now());
+            user.setUpdatedAt(LocalDateTime.now());
             return user;
         });
 
@@ -173,7 +179,6 @@ class AuthServiceTest {
         User capturedUser = userCaptor.getValue();
         assertThat(capturedUser.getEmailVerified()).isFalse();
         assertThat(capturedUser.getSubscriptionTier()).isEqualTo("free");
-        assertThat(capturedUser.getCreatedAt()).isNotNull();
-        assertThat(capturedUser.getUpdatedAt()).isNotNull();
+        // Note: createdAt and updatedAt are set by @PrePersist during actual persistence
     }
 }
