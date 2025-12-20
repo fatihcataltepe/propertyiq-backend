@@ -9,6 +9,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: localhost
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: test-secret-key-for-ci-testing-purposes-only
+    
     services:
       postgres:
         image: postgres:15
@@ -46,22 +54,5 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     
-    - name: Build with Gradle
+    - name: Build and test with Gradle
       run: ./gradlew clean build
-      env:
-        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/postgres
-        SPRING_DATASOURCE_USERNAME: postgres
-        SPRING_DATASOURCE_PASSWORD: postgres
-        SPRING_DATA_REDIS_HOST: localhost
-        SPRING_DATA_REDIS_PORT: 6379
-        JWT_SECRET: test-secret-key-for-ci-testing-purposes-only
-    
-    - name: Run tests
-      run: ./gradlew test
-      env:
-        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/postgres
-        SPRING_DATASOURCE_USERNAME: postgres
-        SPRING_DATASOURCE_PASSWORD: postgres
-        SPRING_DATA_REDIS_HOST: localhost
-        SPRING_DATA_REDIS_PORT: 6379
-        JWT_SECRET: test-secret-key-for-ci-testing-purposes-only
