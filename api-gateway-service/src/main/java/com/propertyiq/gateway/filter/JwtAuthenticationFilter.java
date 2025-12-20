@@ -1,5 +1,6 @@
 package com.propertyiq.gateway.filter;
 
+import com.nimbusds.jwt.SignedJWT;
 import com.propertyiq.gateway.security.JwksKeyProvider;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -16,7 +17,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.security.PublicKey;
-import java.util.Base64;
+import java.text.ParseException;
 import java.util.Map;
 
 @Component
@@ -68,21 +69,10 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     private String extractKidFromToken(String token) {
         try {
-            String[] parts = token.split("\\.");
-            if (parts.length < 2) {
-                return null;
-            }
-            String headerJson = new String(Base64.getUrlDecoder().decode(parts[0]));
-            int kidIndex = headerJson.indexOf("\"kid\"");
-            if (kidIndex == -1) {
-                return null;
-            }
-            int colonIndex = headerJson.indexOf(":", kidIndex);
-            int startQuote = headerJson.indexOf("\"", colonIndex + 1);
-            int endQuote = headerJson.indexOf("\"", startQuote + 1);
-            return headerJson.substring(startQuote + 1, endQuote);
-        } catch (Exception e) {
-            logger.warn("Failed to extract kid from token: {}", e.getMessage());
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            return signedJWT.getHeader().getKeyID();
+        } catch (ParseException e) {
+            logger.warn("Failed to parse JWT token: {}", e.getMessage());
             return null;
         }
     }
