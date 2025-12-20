@@ -180,12 +180,21 @@ curl http://localhost:8080/actuator/health
 
 ### Running Locally with Supabase Authentication
 
-1. Set the required environment variable:
+1. Configure the Supabase URL using one of these methods:
+
+**Option A: Environment variable**
 ```bash
 export SUPABASE_URL="https://your-project.supabase.co"
 ```
 
-Note: No JWT secret is required! The gateway fetches public keys from Supabase's JWKS endpoint.
+**Option B: Config file** (create `application-local.yml` in `src/main/resources/`)
+```yaml
+supabase:
+  url: https://your-project.supabase.co
+```
+Then run with: `./gradlew :api-gateway-service:bootRun --args='--spring.profiles.active=local'`
+
+**Note:** The gateway will fail to start if `SUPABASE_URL` is not configured. No JWT secret is required - the gateway fetches public keys from Supabase's JWKS endpoint.
 
 2. Start the API Gateway:
 ```bash
