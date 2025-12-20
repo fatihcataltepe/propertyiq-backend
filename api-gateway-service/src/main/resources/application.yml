@@ -41,10 +41,12 @@ logging:
     com.propertyiq.gateway: DEBUG
     reactor.netty: INFO
 
-# JWT Configuration
-jwt:
-  secret: ${JWT_SECRET:your-secret-key-change-this-in-production}
-  expiration: 3600000 # 1 hour in milliseconds
+# Supabase Configuration
+# The JWT secret can be found in your Supabase project settings under Settings > API > JWT Settings
+supabase:
+  jwt:
+    secret: ${SUPABASE_JWT_SECRET:your-supabase-jwt-secret-change-this-in-production}
+  url: ${SUPABASE_URL:https://your-project.supabase.co}
 
 # Service URLs (can be overridden for production)
 services:

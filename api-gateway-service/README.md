@@ -15,8 +15,8 @@ Routes incoming requests to appropriate microservices:
 - `/api/notifications/**` → Notification Service (8086)
 
 ### Security
-- **JWT Authentication**: Validates JWT tokens from Auth Service
-- **Token Parsing**: Extracts user context (ID, email, roles) and forwards to services
+- **Supabase JWT Authentication**: Validates JWT tokens issued by Supabase Auth
+- **Token Parsing**: Extracts user context (ID, email, roles) from Supabase JWT claims and forwards to services
 - **CORS Handling**: Centralized CORS configuration for frontend access
 - **SSL/TLS Termination**: Single point for HTTPS (production)
 
@@ -43,9 +43,16 @@ Routes incoming requests to appropriate microservices:
 ## Configuration
 
 ### Environment Variables
-- `JWT_SECRET` - Secret key for JWT validation (must match Auth Service)
+- `SUPABASE_JWT_SECRET` - JWT secret from your Supabase project (Settings > API > JWT Settings)
+- `SUPABASE_URL` - Your Supabase project URL (e.g., `https://your-project.supabase.co`)
 - `SPRING_REDIS_HOST` - Redis host for rate limiting
 - `SPRING_REDIS_PORT` - Redis port
+
+### Obtaining Supabase JWT Secret
+1. Go to your Supabase project dashboard at [supabase.com](https://supabase.com)
+2. Navigate to **Settings** > **API**
+3. Under **JWT Settings**, copy the **JWT Secret**
+4. Set this as the `SUPABASE_JWT_SECRET` environment variable
 
 ### Service URLs
 Configure downstream service URLs via environment or `application.yml`:
@@ -65,7 +72,10 @@ services:
 - **CORS Filter**: Handles cross-origin requests
 
 ### Route Filters
-- **JwtAuthenticationFilter**: Validates JWT and adds user headers
+- **JwtAuthenticationFilter**: Validates Supabase JWT tokens and adds user headers
+  - Validates tokens using the Supabase JWT secret (HS256)
+  - Extracts user ID from `sub` claim, email from `email` claim
+  - Extracts roles from `user_metadata.role`, `app_metadata.role`, or `role` claim
   - Can be applied selectively to protected routes
   - Public routes (e.g., `/api/auth/login`, `/api/auth/signup`) bypass this
 
@@ -147,21 +157,55 @@ spec:
 
 ## Testing
 
+### Running Unit Tests
+```bash
+./gradlew :api-gateway-service:test
+```
+
 ### Health Check
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
-### Test Routing
-```bash
-# Login to get JWT
-JWT=$(curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password"}' | jq -r '.token')
+### Running Locally with Supabase Authentication
 
-# Access protected route
+1. Set the required environment variables:
+```bash
+export SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
+export SUPABASE_URL="https://your-project.supabase.co"
+```
+
+2. Start the API Gateway:
+```bash
+./gradlew :api-gateway-service:bootRun
+```
+
+3. Get a JWT token from your frontend (which uses Supabase Auth) or use the Supabase client:
+```javascript
+// In your frontend using Supabase JS client
+const { data: { session } } = await supabase.auth.getSession()
+const jwt = session?.access_token
+```
+
+4. Test a protected route with the Supabase JWT:
+```bash
+# Using a Supabase access token
 curl http://localhost:8080/api/properties \
-  -H "Authorization: Bearer $JWT"
+  -H "Authorization: Bearer <your-supabase-access-token>"
+```
+
+### Test with a Sample Supabase JWT
+The Supabase JWT contains the following claims that are extracted by the gateway:
+- `sub` - User ID (UUID) -> forwarded as `X-User-Id` header
+- `email` - User email -> forwarded as `X-User-Email` header
+- `role` or `user_metadata.role` or `app_metadata.role` -> forwarded as `X-User-Roles` header
+
+### Verifying Headers are Forwarded
+When a valid JWT is provided, the gateway adds these headers to downstream service requests:
+```
+X-User-Id: 550e8400-e29b-41d4-a716-446655440000
+X-User-Email: user@example.com
+X-User-Roles: authenticated
 ```
 
 ## Benefits

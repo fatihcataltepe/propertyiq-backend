@@ -3,7 +3,10 @@ package com.propertyiq.gateway.filter;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
@@ -13,13 +16,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 @Component
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
-    @Value("${jwt.secret:your-secret-key-change-this-in-production}")
-    private String jwtSecret;
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
+    @Value("${supabase.jwt.secret:your-supabase-jwt-secret-change-this-in-production}")
+    private String supabaseJwtSecret;
 
     private JwtParser jwtParser;
 
@@ -29,10 +36,12 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     @PostConstruct
     public void init() {
-        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = supabaseJwtSecret.getBytes(StandardCharsets.UTF_8);
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
         this.jwtParser = Jwts.parser()
-                .setSigningKey(keyBytes)
+                .verifyWith(key)
                 .build();
+        logger.info("JwtAuthenticationFilter initialized with Supabase JWT secret");
     }
 
     @Override
@@ -50,28 +59,54 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             String token = authHeader.substring(7);
 
             try {
-                Claims claims = jwtParser.parseClaimsJws(token).getBody();
+                Claims claims = jwtParser.parseSignedClaims(token).getPayload();
 
-                // Add user info to request headers for downstream services
+                String userId = claims.getSubject();
+                String email = claims.get("email", String.class);
+                String role = extractRole(claims);
+
+                logger.debug("JWT validated for user: {}, email: {}, role: {}", userId, email, role);
+
                 ServerWebExchange modifiedExchange = exchange.mutate()
-                        .request(r -> r.header("X-User-Id", claims.getSubject())
-                                      .header("X-User-Email", claims.get("email", String.class))
-                                      .header("X-User-Roles", claims.get("roles", String.class)))
+                        .request(r -> r.header("X-User-Id", userId)
+                                      .header("X-User-Email", email != null ? email : "")
+                                      .header("X-User-Roles", role != null ? role : "authenticated"))
                         .build();
 
                 return chain.filter(modifiedExchange);
             } catch (Exception e) {
+                logger.warn("JWT validation failed: {}", e.getMessage());
                 return onError(exchange, "Invalid JWT token: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
             }
         };
     }
 
+    @SuppressWarnings("unchecked")
+    private String extractRole(Claims claims) {
+        Map<String, Object> userMetadata = claims.get("user_metadata", Map.class);
+        if (userMetadata != null && userMetadata.containsKey("role")) {
+            return userMetadata.get("role").toString();
+        }
+
+        Map<String, Object> appMetadata = claims.get("app_metadata", Map.class);
+        if (appMetadata != null && appMetadata.containsKey("role")) {
+            return appMetadata.get("role").toString();
+        }
+
+        String role = claims.get("role", String.class);
+        if (role != null) {
+            return role;
+        }
+
+        return "authenticated";
+    }
+
     private Mono<Void> onError(ServerWebExchange exchange, String error, HttpStatus httpStatus) {
+        logger.debug("Authentication error: {}", error);
         exchange.getResponse().setStatusCode(httpStatus);
         return exchange.getResponse().setComplete();
     }
 
     public static class Config {
-        // Configuration properties if needed
     }
 }
