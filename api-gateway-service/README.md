@@ -15,8 +15,9 @@ Routes incoming requests to appropriate microservices:
 - `/api/notifications/**` → Notification Service (8086)
 
 ### Security
-- **JWT Authentication**: Validates JWT tokens from Auth Service
-- **Token Parsing**: Extracts user context (ID, email, roles) and forwards to services
+- **Supabase JWT Authentication (JWKS)**: Validates JWT tokens using public keys from Supabase's JWKS endpoint
+- **No Secrets Required**: Uses asymmetric key validation - only needs `SUPABASE_URL`, no JWT secret storage
+- **Token Parsing**: Extracts user context (ID, email, roles) from Supabase JWT claims and forwards to services
 - **CORS Handling**: Centralized CORS configuration for frontend access
 - **SSL/TLS Termination**: Single point for HTTPS (production)
 
@@ -35,7 +36,7 @@ Routes incoming requests to appropriate microservices:
 - Spring Cloud Gateway (reactive, non-blocking)
 - Spring Boot Actuator (monitoring)
 - Redis (rate limiting, session storage)
-- JWT (io.jsonwebtoken)
+- JWT (io.jsonwebtoken) with JWKS support (nimbus-jose-jwt)
 
 ## Port
 8080 (main public-facing port)
@@ -43,9 +44,19 @@ Routes incoming requests to appropriate microservices:
 ## Configuration
 
 ### Environment Variables
-- `JWT_SECRET` - Secret key for JWT validation (must match Auth Service)
+- `SUPABASE_URL` - Your Supabase project URL (e.g., `https://your-project.supabase.co`)
 - `SPRING_REDIS_HOST` - Redis host for rate limiting
 - `SPRING_REDIS_PORT` - Redis port
+
+### Supabase JWKS Configuration
+The API Gateway uses JWKS (JSON Web Key Set) for JWT validation, which means **no secrets need to be stored**. The gateway automatically fetches public keys from Supabase's JWKS endpoint.
+
+**Important**: Your Supabase project must use asymmetric JWT signing (RS256 or ES256) for JWKS validation to work. To enable this:
+1. Go to your Supabase project dashboard at [supabase.com](https://supabase.com)
+2. Navigate to **Settings** > **API** > **JWT Settings**
+3. Ensure asymmetric signing is enabled (RS256 recommended)
+
+The gateway fetches keys from: `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`
 
 ### Service URLs
 Configure downstream service URLs via environment or `application.yml`:
@@ -65,9 +76,19 @@ services:
 - **CORS Filter**: Handles cross-origin requests
 
 ### Route Filters
-- **JwtAuthenticationFilter**: Validates JWT and adds user headers
+- **JwtAuthenticationFilter**: Validates Supabase JWT tokens and adds user headers
+  - Validates tokens using public keys from Supabase JWKS endpoint (RS256/ES256)
+  - Extracts `kid` (key ID) from JWT header to select correct public key
+  - Extracts user ID from `sub` claim, email from `email` claim
+  - Extracts roles from `user_metadata.role`, `app_metadata.role`, or `role` claim
+  - Caches JWKS keys for 10 minutes to minimize network calls
   - Can be applied selectively to protected routes
   - Public routes (e.g., `/api/auth/login`, `/api/auth/signup`) bypass this
+
+- **JwksKeyProvider**: Manages JWKS key fetching and caching
+  - Fetches public keys from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`
+  - Caches keys with 10-minute TTL
+  - Supports key rotation via `kid` claim lookup
 
 ## Request Flow
 
@@ -147,21 +168,65 @@ spec:
 
 ## Testing
 
+### Running Unit Tests
+```bash
+./gradlew :api-gateway-service:test
+```
+
 ### Health Check
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
-### Test Routing
-```bash
-# Login to get JWT
-JWT=$(curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password"}' | jq -r '.token')
+### Running Locally with Supabase Authentication
 
-# Access protected route
+1. Configure the Supabase URL using one of these methods:
+
+**Option A: Environment variable**
+```bash
+export SUPABASE_URL="https://your-project.supabase.co"
+```
+
+**Option B: Config file** (create `application-local.yml` in `src/main/resources/`)
+```yaml
+supabase:
+  url: https://your-project.supabase.co
+```
+Then run with: `./gradlew :api-gateway-service:bootRun --args='--spring.profiles.active=local'`
+
+**Note:** The gateway will fail to start if `SUPABASE_URL` is not configured. No JWT secret is required - the gateway fetches public keys from Supabase's JWKS endpoint.
+
+2. Start the API Gateway:
+```bash
+./gradlew :api-gateway-service:bootRun
+```
+
+3. Get a JWT token from your frontend (which uses Supabase Auth) or use the Supabase client:
+```javascript
+// In your frontend using Supabase JS client
+const { data: { session } } = await supabase.auth.getSession()
+const jwt = session?.access_token
+```
+
+4. Test a protected route with the Supabase JWT:
+```bash
+# Using a Supabase access token
 curl http://localhost:8080/api/properties \
-  -H "Authorization: Bearer $JWT"
+  -H "Authorization: Bearer <your-supabase-access-token>"
+```
+
+### Test with a Sample Supabase JWT
+The Supabase JWT contains the following claims that are extracted by the gateway:
+- `sub` - User ID (UUID) -> forwarded as `X-User-Id` header
+- `email` - User email -> forwarded as `X-User-Email` header
+- `role` or `user_metadata.role` or `app_metadata.role` -> forwarded as `X-User-Roles` header
+
+### Verifying Headers are Forwarded
+When a valid JWT is provided, the gateway adds these headers to downstream service requests:
+```
+X-User-Id: 550e8400-e29b-41d4-a716-446655440000
+X-User-Email: user@example.com
+X-User-Roles: authenticated
 ```
 
 ## Benefits
