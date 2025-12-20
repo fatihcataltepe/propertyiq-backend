@@ -1,23 +1,22 @@
 package com.propertyiq.gateway.filter;
 
+import com.propertyiq.gateway.security.JwksKeyProvider;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.security.PublicKey;
+import java.util.Base64;
 import java.util.Map;
 
 @Component
@@ -25,23 +24,12 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
 
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    @Value("${supabase.jwt.secret:your-supabase-jwt-secret-change-this-in-production}")
-    private String supabaseJwtSecret;
+    private final JwksKeyProvider jwksKeyProvider;
 
-    private JwtParser jwtParser;
-
-    public JwtAuthenticationFilter() {
+    public JwtAuthenticationFilter(JwksKeyProvider jwksKeyProvider) {
         super(Config.class);
-    }
-
-    @PostConstruct
-    public void init() {
-        byte[] keyBytes = supabaseJwtSecret.getBytes(StandardCharsets.UTF_8);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-        this.jwtParser = Jwts.parser()
-                .verifyWith(key)
-                .build();
-        logger.info("JwtAuthenticationFilter initialized with Supabase JWT secret");
+        this.jwksKeyProvider = jwksKeyProvider;
+        logger.info("JwtAuthenticationFilter initialized with JWKS-based validation");
     }
 
     @Override
@@ -59,26 +47,74 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             String token = authHeader.substring(7);
 
             try {
-                Claims claims = jwtParser.parseSignedClaims(token).getPayload();
+                String kid = extractKidFromToken(token);
+                if (kid == null) {
+                    logger.warn("JWT token does not contain kid in header");
+                    return onError(exchange, "Invalid JWT token: missing key ID", HttpStatus.UNAUTHORIZED);
+                }
 
-                String userId = claims.getSubject();
-                String email = claims.get("email", String.class);
-                String role = extractRole(claims);
-
-                logger.debug("JWT validated for user: {}, email: {}, role: {}", userId, email, role);
-
-                ServerWebExchange modifiedExchange = exchange.mutate()
-                        .request(r -> r.header("X-User-Id", userId)
-                                      .header("X-User-Email", email != null ? email : "")
-                                      .header("X-User-Roles", role != null ? role : "authenticated"))
-                        .build();
-
-                return chain.filter(modifiedExchange);
+                return jwksKeyProvider.getKey(kid)
+                        .flatMap(publicKey -> validateTokenAndContinue(exchange, chain, token, publicKey))
+                        .onErrorResume(e -> {
+                            logger.warn("JWT validation failed: {}", e.getMessage());
+                            return onError(exchange, "Invalid JWT token: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
+                        });
             } catch (Exception e) {
                 logger.warn("JWT validation failed: {}", e.getMessage());
                 return onError(exchange, "Invalid JWT token: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
             }
         };
+    }
+
+    private String extractKidFromToken(String token) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length < 2) {
+                return null;
+            }
+            String headerJson = new String(Base64.getUrlDecoder().decode(parts[0]));
+            int kidIndex = headerJson.indexOf("\"kid\"");
+            if (kidIndex == -1) {
+                return null;
+            }
+            int colonIndex = headerJson.indexOf(":", kidIndex);
+            int startQuote = headerJson.indexOf("\"", colonIndex + 1);
+            int endQuote = headerJson.indexOf("\"", startQuote + 1);
+            return headerJson.substring(startQuote + 1, endQuote);
+        } catch (Exception e) {
+            logger.warn("Failed to extract kid from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private Mono<Void> validateTokenAndContinue(ServerWebExchange exchange, 
+                                                 GatewayFilterChain chain,
+                                                 String token, 
+                                                 PublicKey publicKey) {
+        return Mono.fromCallable(() -> {
+            Claims claims = Jwts.parser()
+                    .verifyWith(publicKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            String userId = claims.getSubject();
+            String email = claims.get("email", String.class);
+            String role = extractRole(claims);
+
+            logger.debug("JWT validated for user: {}, email: {}, role: {}", userId, email, role);
+
+            return new UserInfo(userId, email, role);
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .flatMap(userInfo -> {
+            ServerWebExchange modifiedExchange = exchange.mutate()
+                    .request(r -> r.header("X-User-Id", userInfo.userId())
+                                  .header("X-User-Email", userInfo.email() != null ? userInfo.email() : "")
+                                  .header("X-User-Roles", userInfo.role() != null ? userInfo.role() : "authenticated"))
+                    .build();
+            return chain.filter(modifiedExchange);
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -106,6 +142,8 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
         exchange.getResponse().setStatusCode(httpStatus);
         return exchange.getResponse().setComplete();
     }
+
+    private record UserInfo(String userId, String email, String role) {}
 
     public static class Config {
     }

@@ -1,7 +1,7 @@
 package com.propertyiq.gateway.filter;
 
+import com.propertyiq.gateway.security.JwksKeyProvider;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
@@ -10,12 +10,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
-import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,25 +24,30 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.never;
 
 class JwtAuthenticationFilterTest {
 
-    private static final String TEST_SECRET = "this-is-a-test-secret-key-that-is-at-least-256-bits-long-for-hs256";
+    private static final String TEST_KID = "test-key-id";
     private static final String TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000";
     private static final String TEST_EMAIL = "test@example.com";
 
     private JwtAuthenticationFilter filter;
+    private JwksKeyProvider jwksKeyProvider;
     private GatewayFilterChain chain;
+    private KeyPair keyPair;
 
     @BeforeEach
-    void setUp() {
-        filter = new JwtAuthenticationFilter();
-        ReflectionTestUtils.setField(filter, "supabaseJwtSecret", TEST_SECRET);
-        filter.init();
+    void setUp() throws Exception {
+        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+        keyGen.initialize(2048);
+        keyPair = keyGen.generateKeyPair();
+
+        jwksKeyProvider = mock(JwksKeyProvider.class);
+        filter = new JwtAuthenticationFilter(jwksKeyProvider);
 
         chain = mock(GatewayFilterChain.class);
         when(chain.filter(any())).thenReturn(Mono.empty());
@@ -74,8 +80,26 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldRejectTokenWithoutKid() {
+        String tokenWithoutKid = createJwtWithoutKid(TEST_USER_ID, TEST_EMAIL, "authenticated", keyPair.getPrivate(), 3600);
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithoutKid)
+                .build();
+        MockServerWebExchange exchange = MockServerWebExchange.from(request);
+
+        GatewayFilter gatewayFilter = filter.apply(new JwtAuthenticationFilter.Config());
+        Mono<Void> result = gatewayFilter.filter(exchange, chain);
+
+        StepVerifier.create(result).verifyComplete();
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+    }
+
+    @Test
     void shouldRejectExpiredToken() {
-        String expiredToken = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", null, -3600);
+        when(jwksKeyProvider.getKey(TEST_KID)).thenReturn(Mono.just(keyPair.getPublic()));
+
+        String expiredToken = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", null, keyPair.getPrivate(), -3600);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken)
@@ -90,12 +114,13 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void shouldRejectTokenWithInvalidSignature() {
-        String differentSecret = "different-secret-key-that-is-also-at-least-256-bits-long-for-hs256";
-        String tokenWithWrongSignature = createJwtWithSecret(TEST_USER_ID, TEST_EMAIL, "authenticated", differentSecret);
+    void shouldRejectTokenWithUnknownKid() {
+        when(jwksKeyProvider.getKey(TEST_KID)).thenReturn(Mono.error(new IllegalArgumentException("Unknown key ID")));
+
+        String token = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", null, keyPair.getPrivate(), 3600);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithWrongSignature)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .build();
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
@@ -108,7 +133,9 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void shouldAcceptValidSupabaseToken() {
-        String validToken = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", null, 3600);
+        when(jwksKeyProvider.getKey(TEST_KID)).thenReturn(Mono.just(keyPair.getPublic()));
+
+        String validToken = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", null, keyPair.getPrivate(), 3600);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + validToken)
@@ -125,10 +152,12 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void shouldExtractRoleFromUserMetadata() {
+        when(jwksKeyProvider.getKey(TEST_KID)).thenReturn(Mono.just(keyPair.getPublic()));
+
         Map<String, Object> userMetadata = new HashMap<>();
         userMetadata.put("role", "LANDLORD");
 
-        String token = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", userMetadata, 3600);
+        String token = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, "authenticated", userMetadata, keyPair.getPrivate(), 3600);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -136,12 +165,17 @@ class JwtAuthenticationFilterTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
         GatewayFilter gatewayFilter = filter.apply(new JwtAuthenticationFilter.Config());
-        gatewayFilter.filter(exchange, chain).block();
+        Mono<Void> result = gatewayFilter.filter(exchange, chain);
+
+        StepVerifier.create(result).verifyComplete();
+        verify(chain).filter(any());
     }
 
     @Test
     void shouldUseDefaultRoleWhenNoRoleProvided() {
-        String token = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, null, null, 3600);
+        when(jwksKeyProvider.getKey(TEST_KID)).thenReturn(Mono.just(keyPair.getPublic()));
+
+        String token = createSupabaseJwt(TEST_USER_ID, TEST_EMAIL, null, null, keyPair.getPrivate(), 3600);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -149,15 +183,20 @@ class JwtAuthenticationFilterTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
         GatewayFilter gatewayFilter = filter.apply(new JwtAuthenticationFilter.Config());
-        gatewayFilter.filter(exchange, chain).block();
+        Mono<Void> result = gatewayFilter.filter(exchange, chain);
+
+        StepVerifier.create(result).verifyComplete();
+        verify(chain).filter(any());
     }
 
     @Test
     void shouldHandleTokenWithAppMetadataRole() {
+        when(jwksKeyProvider.getKey(TEST_KID)).thenReturn(Mono.just(keyPair.getPublic()));
+
         Map<String, Object> appMetadata = new HashMap<>();
         appMetadata.put("role", "ADMIN");
 
-        String token = createSupabaseJwtWithAppMetadata(TEST_USER_ID, TEST_EMAIL, null, appMetadata, 3600);
+        String token = createSupabaseJwtWithAppMetadata(TEST_USER_ID, TEST_EMAIL, null, appMetadata, keyPair.getPrivate(), 3600);
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/test")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
@@ -165,13 +204,13 @@ class JwtAuthenticationFilterTest {
         MockServerWebExchange exchange = MockServerWebExchange.from(request);
 
         GatewayFilter gatewayFilter = filter.apply(new JwtAuthenticationFilter.Config());
-        gatewayFilter.filter(exchange, chain).block();
+        Mono<Void> result = gatewayFilter.filter(exchange, chain);
+
+        StepVerifier.create(result).verifyComplete();
+        verify(chain).filter(any());
     }
 
-    private String createSupabaseJwt(String userId, String email, String role, Map<String, Object> userMetadata, int expirationSeconds) {
-        byte[] keyBytes = TEST_SECRET.getBytes(StandardCharsets.UTF_8);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-
+    private String createSupabaseJwt(String userId, String email, String role, Map<String, Object> userMetadata, PrivateKey privateKey, int expirationSeconds) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("email", email);
         if (role != null) {
@@ -184,18 +223,16 @@ class JwtAuthenticationFilterTest {
         claims.put("aud", "authenticated");
 
         return Jwts.builder()
+                .header().keyId(TEST_KID).and()
                 .subject(userId)
                 .claims(claims)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationSeconds * 1000L))
-                .signWith(key)
+                .signWith(privateKey)
                 .compact();
     }
 
-    private String createSupabaseJwtWithAppMetadata(String userId, String email, String role, Map<String, Object> appMetadata, int expirationSeconds) {
-        byte[] keyBytes = TEST_SECRET.getBytes(StandardCharsets.UTF_8);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-
+    private String createSupabaseJwtWithAppMetadata(String userId, String email, String role, Map<String, Object> appMetadata, PrivateKey privateKey, int expirationSeconds) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("email", email);
         if (role != null) {
@@ -208,18 +245,16 @@ class JwtAuthenticationFilterTest {
         claims.put("aud", "authenticated");
 
         return Jwts.builder()
+                .header().keyId(TEST_KID).and()
                 .subject(userId)
                 .claims(claims)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationSeconds * 1000L))
-                .signWith(key)
+                .signWith(privateKey)
                 .compact();
     }
 
-    private String createJwtWithSecret(String userId, String email, String role, String secret) {
-        byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-
+    private String createJwtWithoutKid(String userId, String email, String role, PrivateKey privateKey, int expirationSeconds) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("email", email);
         claims.put("role", role);
@@ -228,8 +263,8 @@ class JwtAuthenticationFilterTest {
                 .subject(userId)
                 .claims(claims)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 3600 * 1000L))
-                .signWith(key)
+                .expiration(new Date(System.currentTimeMillis() + expirationSeconds * 1000L))
+                .signWith(privateKey)
                 .compact();
     }
 }

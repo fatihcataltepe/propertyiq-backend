@@ -42,10 +42,10 @@ logging:
     reactor.netty: INFO
 
 # Supabase Configuration
-# The JWT secret can be found in your Supabase project settings under Settings > API > JWT Settings
+# JWKS-based JWT validation - no secrets required, only the Supabase project URL
+# The gateway fetches public keys from {SUPABASE_URL}/auth/v1/.well-known/jwks.json
+# Note: Your Supabase project must have asymmetric JWT signing enabled (RS256/ES256)
 supabase:
-  jwt:
-    secret: ${SUPABASE_JWT_SECRET:your-supabase-jwt-secret-change-this-in-production}
   url: ${SUPABASE_URL:https://your-project.supabase.co}
 
 # Service URLs (can be overridden for production)

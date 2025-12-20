@@ -15,7 +15,8 @@ Routes incoming requests to appropriate microservices:
 - `/api/notifications/**` → Notification Service (8086)
 
 ### Security
-- **Supabase JWT Authentication**: Validates JWT tokens issued by Supabase Auth
+- **Supabase JWT Authentication (JWKS)**: Validates JWT tokens using public keys from Supabase's JWKS endpoint
+- **No Secrets Required**: Uses asymmetric key validation - only needs `SUPABASE_URL`, no JWT secret storage
 - **Token Parsing**: Extracts user context (ID, email, roles) from Supabase JWT claims and forwards to services
 - **CORS Handling**: Centralized CORS configuration for frontend access
 - **SSL/TLS Termination**: Single point for HTTPS (production)
@@ -35,7 +36,7 @@ Routes incoming requests to appropriate microservices:
 - Spring Cloud Gateway (reactive, non-blocking)
 - Spring Boot Actuator (monitoring)
 - Redis (rate limiting, session storage)
-- JWT (io.jsonwebtoken)
+- JWT (io.jsonwebtoken) with JWKS support (nimbus-jose-jwt)
 
 ## Port
 8080 (main public-facing port)
@@ -43,16 +44,19 @@ Routes incoming requests to appropriate microservices:
 ## Configuration
 
 ### Environment Variables
-- `SUPABASE_JWT_SECRET` - JWT secret from your Supabase project (Settings > API > JWT Settings)
 - `SUPABASE_URL` - Your Supabase project URL (e.g., `https://your-project.supabase.co`)
 - `SPRING_REDIS_HOST` - Redis host for rate limiting
 - `SPRING_REDIS_PORT` - Redis port
 
-### Obtaining Supabase JWT Secret
+### Supabase JWKS Configuration
+The API Gateway uses JWKS (JSON Web Key Set) for JWT validation, which means **no secrets need to be stored**. The gateway automatically fetches public keys from Supabase's JWKS endpoint.
+
+**Important**: Your Supabase project must use asymmetric JWT signing (RS256 or ES256) for JWKS validation to work. To enable this:
 1. Go to your Supabase project dashboard at [supabase.com](https://supabase.com)
-2. Navigate to **Settings** > **API**
-3. Under **JWT Settings**, copy the **JWT Secret**
-4. Set this as the `SUPABASE_JWT_SECRET` environment variable
+2. Navigate to **Settings** > **API** > **JWT Settings**
+3. Ensure asymmetric signing is enabled (RS256 recommended)
+
+The gateway fetches keys from: `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`
 
 ### Service URLs
 Configure downstream service URLs via environment or `application.yml`:
@@ -73,11 +77,18 @@ services:
 
 ### Route Filters
 - **JwtAuthenticationFilter**: Validates Supabase JWT tokens and adds user headers
-  - Validates tokens using the Supabase JWT secret (HS256)
+  - Validates tokens using public keys from Supabase JWKS endpoint (RS256/ES256)
+  - Extracts `kid` (key ID) from JWT header to select correct public key
   - Extracts user ID from `sub` claim, email from `email` claim
   - Extracts roles from `user_metadata.role`, `app_metadata.role`, or `role` claim
+  - Caches JWKS keys for 10 minutes to minimize network calls
   - Can be applied selectively to protected routes
   - Public routes (e.g., `/api/auth/login`, `/api/auth/signup`) bypass this
+
+- **JwksKeyProvider**: Manages JWKS key fetching and caching
+  - Fetches public keys from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`
+  - Caches keys with 10-minute TTL
+  - Supports key rotation via `kid` claim lookup
 
 ## Request Flow
 
@@ -169,11 +180,12 @@ curl http://localhost:8080/actuator/health
 
 ### Running Locally with Supabase Authentication
 
-1. Set the required environment variables:
+1. Set the required environment variable:
 ```bash
-export SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
 export SUPABASE_URL="https://your-project.supabase.co"
 ```
+
+Note: No JWT secret is required! The gateway fetches public keys from Supabase's JWKS endpoint.
 
 2. Start the API Gateway:
 ```bash
