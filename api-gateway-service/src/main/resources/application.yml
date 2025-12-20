@@ -47,8 +47,11 @@ logging:
 # JWKS-based JWT validation - no secrets required, only the Supabase project URL
 # The gateway fetches public keys from {SUPABASE_URL}/auth/v1/.well-known/jwks.json
 # Note: Your Supabase project must have asymmetric JWT signing enabled (RS256/ES256)
+#
+# Set via environment variable: export SUPABASE_URL=https://your-project.supabase.co
+# Or create application-local.yml with: supabase.url: https://your-project.supabase.co
 supabase:
-  url: ${SUPABASE_URL:https://your-project.supabase.co}
+  url: ${SUPABASE_URL:}
 
 # Service URLs (can be overridden for production)
 services:

@@ -26,7 +26,7 @@ public class JwksKeyProvider {
     private static final Logger logger = LoggerFactory.getLogger(JwksKeyProvider.class);
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
-    @Value("${supabase.url:https://your-project.supabase.co}")
+    @Value("${supabase.url:}")
     private String supabaseUrl;
 
     private final WebClient webClient;
@@ -39,6 +39,13 @@ public class JwksKeyProvider {
 
     @PostConstruct
     public void init() {
+        if (supabaseUrl == null || supabaseUrl.isBlank()) {
+            throw new IllegalStateException(
+                "SUPABASE_URL is not configured. " +
+                "Set the SUPABASE_URL environment variable or add 'supabase.url' to application.yml. " +
+                "Example: export SUPABASE_URL=https://your-project.supabase.co"
+            );
+        }
         logger.info("JwksKeyProvider initialized with Supabase URL: {}", supabaseUrl);
     }
 
