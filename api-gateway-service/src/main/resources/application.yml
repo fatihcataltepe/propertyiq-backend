@@ -67,3 +67,11 @@ services:
     url: http://localhost:8085
   notification:
     url: http://localhost:8086
+
+# OpenAPI documentation
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method

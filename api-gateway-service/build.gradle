@@ -14,6 +14,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
+    
+    // OpenAPI documentation (WebFlux for reactive gateway)
+    implementation 'org.springdoc:springdoc-openapi-starter-webflux-ui:2.3.0'
+    
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'io.projectreactor:reactor-test'
 }

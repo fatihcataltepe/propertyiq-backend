@@ -20,3 +20,11 @@ logging:
   level:
     com.propertyiq.notification: DEBUG
     org.springframework.web: INFO
+
+# OpenAPI documentation
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method

@@ -31,3 +31,11 @@ services:
     url: http://localhost:8083
   analytics:
     url: http://localhost:8084
+
+# OpenAPI documentation
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
