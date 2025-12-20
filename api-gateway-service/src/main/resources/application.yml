@@ -51,7 +51,7 @@ logging:
 # Set via environment variable: export SUPABASE_URL=https://your-project.supabase.co
 # Or create application-local.yml with: supabase.url: https://your-project.supabase.co
 supabase:
-  url: ${SUPABASE_URL:https://fwwitbpjqdmvzrpcklnq.supabase.co}
+  url: ${SUPABASE_URL:}
 
 # Service URLs (can be overridden for production)
 services:
