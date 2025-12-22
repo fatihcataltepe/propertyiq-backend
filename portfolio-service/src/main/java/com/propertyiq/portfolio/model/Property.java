@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "properties")
+@Table(name = "properties", schema="portfolio_db")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
