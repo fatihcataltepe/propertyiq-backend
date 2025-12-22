@@ -139,10 +139,16 @@ public class MortgageCalculator {
     }
 
     private BigDecimal power(BigDecimal base, int exponent) {
+        if (exponent < 0) {
+            throw new IllegalArgumentException("Exponent must be non-negative");
+        }
         if (exponent == 0) {
             return BigDecimal.ONE;
         }
-        double result = Math.pow(base.doubleValue(), exponent);
-        return BigDecimal.valueOf(result).setScale(ROUNDING_SCALE, RoundingMode.HALF_UP);
+        BigDecimal result = BigDecimal.ONE;
+        for (int i = 0; i < exponent; i++) {
+            result = result.multiply(base).setScale(ROUNDING_SCALE, RoundingMode.HALF_UP);
+        }
+        return result;
     }
 }

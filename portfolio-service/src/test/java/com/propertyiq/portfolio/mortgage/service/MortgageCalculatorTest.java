@@ -31,7 +31,7 @@ class MortgageCalculatorTest {
 
             BigDecimal monthlyPayment = calculator.calculateMonthlyPayment(principal, annualRate, termYears);
 
-            assertEquals(2001.00, monthlyPayment.doubleValue(), 2.0);
+            assertEquals(new BigDecimal("2001.00"), monthlyPayment);
         }
 
         @Test

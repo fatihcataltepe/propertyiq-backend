@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MortgagePaymentService {
 
+    private static final BigDecimal SCHEDULED_PAYMENT_TOLERANCE_FRACTION = new BigDecimal("0.05");
+
     private final MortgagePaymentRepository paymentRepository;
     private final MortgageRepository mortgageRepository;
     private final MortgageCalculator mortgageCalculator;
@@ -189,7 +191,7 @@ public class MortgagePaymentService {
             return PaymentType.TOPUP;
         }
 
-        BigDecimal tolerance = expectedPayment.multiply(new BigDecimal("0.05"));
+        BigDecimal tolerance = expectedPayment.multiply(SCHEDULED_PAYMENT_TOLERANCE_FRACTION);
         BigDecimal lowerBound = expectedPayment.subtract(tolerance);
         BigDecimal upperBound = expectedPayment.add(tolerance);
 

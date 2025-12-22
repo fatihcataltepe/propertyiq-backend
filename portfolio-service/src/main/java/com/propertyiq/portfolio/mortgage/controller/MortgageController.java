@@ -23,14 +23,14 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/mortgages")
 @RequiredArgsConstructor
 public class MortgageController {
 
     private final MortgageService mortgageService;
     private final MortgagePaymentService paymentService;
 
-    @PostMapping("/properties/{propertyId}/mortgages")
+    @PostMapping("/property/{propertyId}")
     public ResponseEntity<ApiResponse<MortgageResponse>> createMortgage(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID propertyId,
@@ -41,7 +41,7 @@ public class MortgageController {
                 .body(ApiResponse.success("Mortgage created successfully", response));
     }
 
-    @GetMapping("/properties/{propertyId}/mortgages")
+    @GetMapping("/property/{propertyId}")
     public ResponseEntity<ApiResponse<List<MortgageResponse>>> getMortgagesForProperty(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID propertyId,
@@ -55,7 +55,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(mortgages));
     }
 
-    @GetMapping("/mortgages/{mortgageId}")
+    @GetMapping("/{mortgageId}")
     public ResponseEntity<ApiResponse<MortgageResponse>> getMortgage(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId) {
@@ -63,7 +63,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @GetMapping("/mortgages/{mortgageId}/summary")
+    @GetMapping("/{mortgageId}/summary")
     public ResponseEntity<ApiResponse<MortgageSummary>> getMortgageSummary(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId) {
@@ -71,7 +71,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(summary));
     }
 
-    @GetMapping("/mortgages")
+    @GetMapping
     public ResponseEntity<ApiResponse<List<MortgageResponse>>> getAllMortgagesForUser(
             @RequestHeader("X-User-Id") UUID userId,
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly) {
@@ -84,7 +84,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(mortgages));
     }
 
-    @PostMapping("/mortgages/{mortgageId}/payments")
+    @PostMapping("/{mortgageId}/payments")
     public ResponseEntity<ApiResponse<MortgagePaymentResponse>> recordPayment(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId,
@@ -95,7 +95,7 @@ public class MortgageController {
                 .body(ApiResponse.success("Payment recorded successfully", response));
     }
 
-    @GetMapping("/mortgages/{mortgageId}/payments")
+    @GetMapping("/{mortgageId}/payments")
     public ResponseEntity<ApiResponse<Page<MortgagePaymentResponse>>> getPaymentHistory(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId,
@@ -106,7 +106,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(payments));
     }
 
-    @GetMapping("/mortgages/{mortgageId}/payments/all")
+    @GetMapping("/{mortgageId}/payments/all")
     public ResponseEntity<ApiResponse<List<MortgagePaymentResponse>>> getAllPayments(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId) {
@@ -114,7 +114,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(payments));
     }
 
-    @GetMapping("/mortgages/{mortgageId}/payments/topups")
+    @GetMapping("/{mortgageId}/payments/topups")
     public ResponseEntity<ApiResponse<List<MortgagePaymentResponse>>> getTopUpPayments(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId) {
@@ -122,7 +122,7 @@ public class MortgageController {
         return ResponseEntity.ok(ApiResponse.success(payments));
     }
 
-    @PostMapping("/mortgages/{mortgageId}/remortgage")
+    @PostMapping("/{mortgageId}/remortgage")
     public ResponseEntity<ApiResponse<MortgageResponse>> remortgage(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId,
@@ -133,7 +133,7 @@ public class MortgageController {
                 .body(ApiResponse.success("Remortgage completed successfully", response));
     }
 
-    @PatchMapping("/mortgages/{mortgageId}/interest-rate")
+    @PatchMapping("/{mortgageId}/interest-rate")
     public ResponseEntity<ApiResponse<MortgageResponse>> updateInterestRate(
             @RequestHeader("X-User-Id") UUID userId,
             @PathVariable UUID mortgageId,

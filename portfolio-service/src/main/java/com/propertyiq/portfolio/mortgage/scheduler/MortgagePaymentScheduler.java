@@ -60,27 +60,4 @@ public class MortgagePaymentScheduler {
         }
     }
 
-    @Scheduled(cron = "0 0 1 1 * *")
-    public void monthlyReconciliation() {
-        log.info("Starting monthly mortgage reconciliation");
-        LocalDate lastMonth = LocalDate.now().minusMonths(1);
-
-        List<Mortgage> activeMortgages = mortgageRepository.findAll().stream()
-                .filter(Mortgage::getIsActive)
-                .toList();
-
-        for (Mortgage mortgage : activeMortgages) {
-            try {
-                reconcileMortgage(mortgage, lastMonth);
-            } catch (Exception e) {
-                log.error("Failed to reconcile mortgage {}: {}", mortgage.getId(), e.getMessage());
-            }
-        }
-
-        log.info("Completed monthly reconciliation for {} mortgages", activeMortgages.size());
-    }
-
-    private void reconcileMortgage(Mortgage mortgage, LocalDate asOfDate) {
-        log.debug("Reconciling mortgage {} as of {}", mortgage.getId(), asOfDate);
-    }
 }
