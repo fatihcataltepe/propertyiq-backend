@@ -15,8 +15,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,10 +32,15 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PropertyServiceTest {
 
+    private static final LocalDate FIXED_DATE = LocalDate.of(2024, 6, 15);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            FIXED_DATE.atStartOfDay(ZoneId.systemDefault()).toInstant(),
+            ZoneId.systemDefault()
+    );
+
     @Mock
     private PropertyRepository propertyRepository;
 
-    @InjectMocks
     private PropertyService propertyService;
 
     private UUID userId;
@@ -42,6 +50,7 @@ class PropertyServiceTest {
 
     @BeforeEach
     void setUp() {
+        propertyService = new PropertyService(propertyRepository, FIXED_CLOCK);
         userId = UUID.randomUUID();
         propertyId = UUID.randomUUID();
 
@@ -255,7 +264,7 @@ class PropertyServiceTest {
         Property capturedProperty = propertyCaptor.getValue();
         assertThat(capturedProperty.getCurrentValue()).isEqualByComparingTo(new BigDecimal("550000"));
         assertThat(capturedProperty.getValuationSource()).isEqualTo(ValuationSource.USER_INPUT);
-        assertThat(capturedProperty.getLastValuationDate()).isEqualTo(LocalDate.now());
+        assertThat(capturedProperty.getLastValuationDate()).isEqualTo(FIXED_DATE);
     }
 
     @Test

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class PropertyService {
 
     private final PropertyRepository propertyRepository;
+    private final Clock clock;
 
     @Transactional
     public PropertyResponse createProperty(UUID userId, CreatePropertyRequest request) {
@@ -122,7 +124,7 @@ public class PropertyService {
         }
 
         property.setCurrentValue(request.getNewValue());
-        property.setLastValuationDate(LocalDate.now());
+        property.setLastValuationDate(LocalDate.now(clock));
         property.setValuationSource(request.getSource());
 
         Property savedProperty = propertyRepository.save(property);
