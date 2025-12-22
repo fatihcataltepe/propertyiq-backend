@@ -3,6 +3,7 @@ package com.propertyiq.portfolio.mortgage.service;
 import com.propertyiq.portfolio.mortgage.dto.CreateMortgageRequest;
 import com.propertyiq.portfolio.mortgage.dto.MortgageResponse;
 import com.propertyiq.portfolio.mortgage.dto.MortgageSummary;
+import com.propertyiq.portfolio.mortgage.dto.RemortgageRequest;
 import com.propertyiq.portfolio.mortgage.exception.MortgageNotFoundException;
 import com.propertyiq.portfolio.mortgage.model.Mortgage;
 import com.propertyiq.portfolio.mortgage.repository.MortgageRepository;
@@ -113,6 +114,78 @@ public class MortgageService {
                 .stream()
                 .map(MortgageResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public MortgageResponse remortgage(UUID userId, UUID existingMortgageId, RemortgageRequest request) {
+        Mortgage existingMortgage = findMortgageByIdAndUserId(existingMortgageId, userId);
+
+        if (!existingMortgage.getIsActive()) {
+            throw new IllegalStateException("Cannot remortgage an inactive mortgage");
+        }
+
+        existingMortgage.setIsActive(false);
+        existingMortgage.setEndDate(request.getStartDate().minusDays(1));
+        mortgageRepository.save(existingMortgage);
+
+        BigDecimal monthlyPayment = mortgageCalculator.calculateMonthlyPayment(
+                request.getNewLoanAmount(),
+                request.getInterestRate(),
+                request.getTermYears()
+        );
+
+        Integer sequenceNumber = mortgageRepository.findNextSequenceNumber(existingMortgage.getPropertyId());
+
+        Mortgage newMortgage = Mortgage.builder()
+                .userId(userId)
+                .propertyId(existingMortgage.getPropertyId())
+                .sequenceNumber(sequenceNumber)
+                .lender(request.getLender())
+                .originalLoanAmount(request.getNewLoanAmount())
+                .interestRate(request.getInterestRate())
+                .termYears(request.getTermYears())
+                .mortgageType(request.getMortgageType())
+                .productType(request.getProductType())
+                .startDate(request.getStartDate())
+                .endDate(request.getStartDate().plusYears(request.getTermYears()))
+                .currentBalance(request.getNewLoanAmount())
+                .monthlyPayment(monthlyPayment)
+                .notes(request.getNotes())
+                .isActive(true)
+                .linkedToMortgageId(existingMortgageId)
+                .principalPaidToDate(BigDecimal.ZERO)
+                .interestPaidToDate(BigDecimal.ZERO)
+                .build();
+
+        Mortgage savedMortgage = mortgageRepository.save(newMortgage);
+        return MortgageResponse.fromEntity(savedMortgage);
+    }
+
+    @Transactional
+    public MortgageResponse updateInterestRate(UUID userId, UUID mortgageId, BigDecimal newInterestRate) {
+        Mortgage mortgage = findMortgageByIdAndUserId(mortgageId, userId);
+
+        if (!mortgage.getIsActive()) {
+            throw new IllegalStateException("Cannot update interest rate on an inactive mortgage");
+        }
+
+        mortgage.setInterestRate(newInterestRate);
+
+        BigDecimal newMonthlyPayment = mortgageCalculator.calculateMonthlyPayment(
+                mortgage.getCurrentBalance(),
+                newInterestRate,
+                calculateRemainingYears(mortgage)
+        );
+
+        mortgage.setMonthlyPayment(newMonthlyPayment);
+        Mortgage savedMortgage = mortgageRepository.save(mortgage);
+        return MortgageResponse.fromEntity(savedMortgage);
+    }
+
+    private Integer calculateRemainingYears(Mortgage mortgage) {
+        long monthsRemaining = java.time.temporal.ChronoUnit.MONTHS.between(
+                java.time.LocalDate.now(), mortgage.getEndDate());
+        return Math.max(1, (int) Math.ceil(monthsRemaining / 12.0));
     }
 
     private Mortgage findMortgageByIdAndUserId(UUID mortgageId, UUID userId) {

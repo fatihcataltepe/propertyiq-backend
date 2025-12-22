@@ -6,6 +6,7 @@ import com.propertyiq.portfolio.mortgage.dto.MortgagePaymentResponse;
 import com.propertyiq.portfolio.mortgage.dto.MortgageResponse;
 import com.propertyiq.portfolio.mortgage.dto.MortgageSummary;
 import com.propertyiq.portfolio.mortgage.dto.RecordPaymentRequest;
+import com.propertyiq.portfolio.mortgage.dto.RemortgageRequest;
 import com.propertyiq.portfolio.mortgage.service.MortgagePaymentService;
 import com.propertyiq.portfolio.mortgage.service.MortgageService;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -118,5 +120,25 @@ public class MortgageController {
             @PathVariable UUID mortgageId) {
         List<MortgagePaymentResponse> payments = paymentService.getTopUpPayments(userId, mortgageId);
         return ResponseEntity.ok(ApiResponse.success(payments));
+    }
+
+    @PostMapping("/mortgages/{mortgageId}/remortgage")
+    public ResponseEntity<ApiResponse<MortgageResponse>> remortgage(
+            @RequestHeader("X-User-Id") UUID userId,
+            @PathVariable UUID mortgageId,
+            @Valid @RequestBody RemortgageRequest request) {
+        MortgageResponse response = mortgageService.remortgage(userId, mortgageId, request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Remortgage completed successfully", response));
+    }
+
+    @PatchMapping("/mortgages/{mortgageId}/interest-rate")
+    public ResponseEntity<ApiResponse<MortgageResponse>> updateInterestRate(
+            @RequestHeader("X-User-Id") UUID userId,
+            @PathVariable UUID mortgageId,
+            @RequestParam BigDecimal newRate) {
+        MortgageResponse response = mortgageService.updateInterestRate(userId, mortgageId, newRate);
+        return ResponseEntity.ok(ApiResponse.success("Interest rate updated successfully", response));
     }
 }
