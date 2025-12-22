@@ -2,7 +2,6 @@ package com.propertyiq.portfolio.dto;
 
 import com.propertyiq.portfolio.model.Address;
 import com.propertyiq.portfolio.model.Country;
-import com.propertyiq.portfolio.model.Currency;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,10 +19,8 @@ public class AddressResponse {
     private String state;
     private String postalCode;
     private Country country;
-    private Currency currency;
     private String fullAddress;
     private String displayAddress;
-    private String currencySymbol;
 
     public static AddressResponse fromEntity(Address address) {
         if (address == null) {
@@ -36,10 +33,8 @@ public class AddressResponse {
                 .state(address.getState())
                 .postalCode(address.getPostalCode())
                 .country(address.getCountry())
-                .currency(address.getCurrency())
                 .fullAddress(address.getFullAddress())
                 .displayAddress(address.getDisplayAddress())
-                .currencySymbol(address.getCurrencySymbol())
                 .build();
     }
 }

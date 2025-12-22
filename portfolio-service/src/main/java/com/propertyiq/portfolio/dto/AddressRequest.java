@@ -1,7 +1,6 @@
 package com.propertyiq.portfolio.dto;
 
 import com.propertyiq.portfolio.model.Country;
-import com.propertyiq.portfolio.model.Currency;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -36,7 +35,4 @@ public class AddressRequest {
 
     @NotNull(message = "Country is required")
     private Country country;
-
-    @NotNull(message = "Currency is required")
-    private Currency currency;
 }

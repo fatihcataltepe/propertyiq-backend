@@ -1,5 +1,6 @@
 package com.propertyiq.portfolio.dto;
 
+import com.propertyiq.portfolio.model.Currency;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -28,6 +29,9 @@ public class CreatePropertyRequest {
 
     @NotNull(message = "Purchase date is required")
     private LocalDate purchaseDate;
+
+    @NotNull(message = "Currency is required")
+    private Currency currency;
 
     @Size(max = 50, message = "Property type must not exceed 50 characters")
     private String propertyType;

@@ -1,5 +1,6 @@
 package com.propertyiq.portfolio.dto;
 
+import com.propertyiq.portfolio.model.Currency;
 import com.propertyiq.portfolio.model.Property;
 import com.propertyiq.portfolio.model.PropertyStatus;
 import com.propertyiq.portfolio.model.ValuationSource;
@@ -24,6 +25,8 @@ public class PropertyResponse {
     private AddressResponse address;
     private BigDecimal purchasePrice;
     private LocalDate purchaseDate;
+    private Currency currency;
+    private String currencySymbol;
     private BigDecimal currentValue;
     private LocalDate lastValuationDate;
     private ValuationSource valuationSource;
@@ -46,6 +49,8 @@ public class PropertyResponse {
                 .address(AddressResponse.fromEntity(property.getAddress()))
                 .purchasePrice(property.getPurchasePrice())
                 .purchaseDate(property.getPurchaseDate())
+                .currency(property.getCurrency())
+                .currencySymbol(property.getCurrency() != null ? property.getCurrency().getSymbol() : "")
                 .currentValue(property.getCurrentValue())
                 .lastValuationDate(property.getLastValuationDate())
                 .valuationSource(property.getValuationSource())

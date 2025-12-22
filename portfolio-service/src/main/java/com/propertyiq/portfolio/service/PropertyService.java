@@ -29,7 +29,6 @@ public class PropertyService {
                 .state(request.getAddress().getState())
                 .postalCode(request.getAddress().getPostalCode())
                 .country(request.getAddress().getCountry())
-                .currency(request.getAddress().getCurrency())
                 .build();
 
         Property property = Property.builder()
@@ -37,6 +36,7 @@ public class PropertyService {
                 .address(address)
                 .purchasePrice(request.getPurchasePrice())
                 .purchaseDate(request.getPurchaseDate())
+                .currency(request.getCurrency())
                 .currentValue(request.getPurchasePrice())
                 .propertyType(request.getPropertyType())
                 .bedrooms(request.getBedrooms())
@@ -74,7 +74,7 @@ public class PropertyService {
     public PropertyResponse updateProperty(UUID userId, UUID propertyId, UpdatePropertyRequest request) {
         Property property = findPropertyByIdAndUserId(propertyId, userId);
 
-        if (property.getStatus() == PropertyStatus.ARCHIVED) {
+        if (PropertyStatus.ARCHIVED.equals(property.getStatus())) {
             throw new InvalidPropertyStateException("Cannot update an archived property");
         }
 
@@ -86,7 +86,6 @@ public class PropertyService {
                     .state(request.getAddress().getState())
                     .postalCode(request.getAddress().getPostalCode())
                     .country(request.getAddress().getCountry())
-                    .currency(request.getAddress().getCurrency())
                     .build();
             property.setAddress(address);
         }
@@ -118,7 +117,7 @@ public class PropertyService {
     public PropertyResponse updateValuation(UUID userId, UUID propertyId, UpdateValuationRequest request) {
         Property property = findPropertyByIdAndUserId(propertyId, userId);
 
-        if (property.getStatus() != PropertyStatus.ACTIVE) {
+        if (!PropertyStatus.ACTIVE.equals(property.getStatus())) {
             throw new InvalidPropertyStateException("Cannot update valuation for a non-active property");
         }
 
@@ -134,7 +133,7 @@ public class PropertyService {
     public PropertyResponse markAsSold(UUID userId, UUID propertyId, MarkAsSoldRequest request) {
         Property property = findPropertyByIdAndUserId(propertyId, userId);
 
-        if (property.getStatus() != PropertyStatus.ACTIVE) {
+        if (!PropertyStatus.ACTIVE.equals(property.getStatus())) {
             throw new InvalidPropertyStateException("Only active properties can be marked as sold");
         }
 
@@ -150,7 +149,7 @@ public class PropertyService {
     public PropertyResponse archiveProperty(UUID userId, UUID propertyId) {
         Property property = findPropertyByIdAndUserId(propertyId, userId);
 
-        if (property.getStatus() == PropertyStatus.ARCHIVED) {
+        if (PropertyStatus.ARCHIVED.equals(property.getStatus())) {
             throw new InvalidPropertyStateException("Property is already archived");
         }
 

@@ -35,10 +35,6 @@ public class Address {
     @Enumerated(EnumType.STRING)
     private Country country;
 
-    @Column(name = "currency", nullable = false, length = 3)
-    @Enumerated(EnumType.STRING)
-    private Currency currency;
-
     public String getFullAddress() {
         return String.format("%s%s, %s%s, %s, %s",
                 line1,
@@ -55,12 +51,10 @@ public class Address {
                 return String.format("%s, %s %s, %s", line1, city, postalCode, country);
             case USA:
                 return String.format("%s, %s, %s %s", line1, city, state, postalCode);
+            case ITALY:
+                return String.format("%s, %s %s, %s", line1, postalCode, city, country);
             default:
                 return getFullAddress();
         }
-    }
-
-    public String getCurrencySymbol() {
-        return currency != null ? currency.getSymbol() : "";
     }
 }
