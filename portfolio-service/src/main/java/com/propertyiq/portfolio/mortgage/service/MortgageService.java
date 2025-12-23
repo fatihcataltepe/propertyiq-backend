@@ -183,6 +183,9 @@ public class MortgageService {
     }
 
     private Integer calculateRemainingYears(Mortgage mortgage) {
+        if (!mortgage.getEndDate().isAfter(java.time.LocalDate.now())) {
+            throw new IllegalStateException("Cannot calculate remaining years for a mortgage that has already ended");
+        }
         long monthsRemaining = java.time.temporal.ChronoUnit.MONTHS.between(
                 java.time.LocalDate.now(), mortgage.getEndDate());
         return Math.max(1, (int) Math.ceil(monthsRemaining / 12.0));
