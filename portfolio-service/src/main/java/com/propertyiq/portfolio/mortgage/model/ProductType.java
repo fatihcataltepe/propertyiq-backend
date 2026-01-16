@@ -5,7 +5,7 @@ public enum ProductType {
     VARIABLE("Variable Rate", "Rate changes with the lender's standard variable rate"),
     TRACKER("Tracker Rate", "Rate tracks the Bank of England base rate plus a margin"),
     OFFSET("Offset Mortgage", "Interest calculated against net balance after savings offset"),
-    SVR("Standard Variable Rate", "Lender's standard variable rate after fixed period ends");
+    SVR("Standard Variable Rate", "Lender's standard variable interest rate product");
 
     private final String displayName;
     private final String description;
